@@ -1,0 +1,33 @@
+{
+  "name": "nl2build-backend",
+  "version": "1.0.0",
+  "description": "Backend service for NL2Build - Android app builder",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "build": "echo 'No build step required'",
+    "docker:build": "docker build -t nl2build-backend .",
+    "docker:run": "docker run -p 3000:3000 nl2build-backend"
+  },
+  "keywords": [
+    "android",
+    "app-builder",
+    "ai",
+    "cicd"
+  ],
+  "author": "NL2Build",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "body-parser": "^1.20.2",
+    "uuid": "^9.0.1",
+    "fs-extra": "^11.2.0",
+    "archiver": "^6.0.1",
+    "multer": "^1.4.5-lts.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}

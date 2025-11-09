@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">NL2Build</string>
+    <string name="app_description">Build Android Apps with Natural Language</string>
+
+    <!-- Main Screen -->
+    <string name="describe_your_app">Describe Your App</string>
+    <string name="describe_app_hint">Describe the Android app you want to build in natural language. Be as detailed as possible about features, UI, and functionality.</string>
+    <string name="generate_app">Generate App</string>
+    <string name="my_projects">My Projects</string>
+    <string name="settings">Settings</string>
+
+    <!-- Progress -->
+    <string name="processing">Processing…</string>
+    <string name="layer1_processing">Layer 1 AI: Analyzing your description…</string>
+    <string name="layer2_processing">Layer 2 AI: Building Android project…</string>
+    <string name="building">Building and packaging app…</string>
+    <string name="signing">Signing app…</string>
+    <string name="ready">Your app is ready!</string>
+
+    <!-- Actions -->
+    <string name="install_now">Install on Device</string>
+    <string name="upload_play_console">Upload to Play Console</string>
+    <string name="download_apk">Download APK</string>
+    <string name="download_aab">Download AAB</string>
+    <string name="view_details">View Details</string>
+    <string name="cancel">Cancel</string>
+
+    <!-- Projects -->
+    <string name="no_projects">No projects yet</string>
+    <string name="start_creating">Start creating your first app!</string>
+    <string name="project_status_processing">Processing</string>
+    <string name="project_status_building">Building</string>
+    <string name="project_status_ready">Ready</string>
+    <string name="project_status_failed">Failed</string>
+
+    <!-- Settings -->
+    <string name="api_configuration">API Configuration</string>
+    <string name="anthropic_api_key">Anthropic API Key</string>
+    <string name="backend_url">Backend URL</string>
+    <string name="backend_url_hint">https://your-backend.com/api</string>
+    <string name="save">Save</string>
+    <string name="saved">Settings saved</string>
+
+    <!-- Errors -->
+    <string name="error_occurred">An error occurred</string>
+    <string name="error_no_api_key">Please configure your API key in settings</string>
+    <string name="error_network">Network error. Please check your connection.</string>
+    <string name="error_generation_failed">App generation failed</string>
+    <string name="retry">Retry</string>
+
+    <!-- Install -->
+    <string name="install_permission_required">Installation permission required</string>
+    <string name="downloading">Downloading…</string>
+    <string name="installing">Installing…</string>
+</resources>
