@@ -153,18 +153,20 @@ Respond with ONLY the JSON, no additional text.
     }
 
     private suspend fun callAnthropicAPI(prompt: String): String {
-        val requestBody = """
-{
-  "model": "claude-3-5-sonnet-20241022",
-  "max_tokens": 4096,
-  "messages": [
-    {
-      "role": "user",
-      "content": "${ prompt.replace("\"", "\\\"").replace("\n", "\\n") }"
-    }
-  ]
-}
-        """.trimIndent()
+        // Use Gson for proper JSON encoding
+        val requestMap = mapOf(
+            "model" to "claude-3-5-sonnet-20241022",
+            "max_tokens" to 4096,
+            "messages" to listOf(
+                mapOf(
+                    "role" to "user",
+                    "content" to prompt
+                )
+            )
+        )
+
+        val gson = com.google.gson.Gson()
+        val requestBody = gson.toJson(requestMap)
 
         val request = Request.Builder()
             .url("https://api.anthropic.com/v1/messages")
@@ -187,11 +189,20 @@ Respond with ONLY the JSON, no additional text.
     }
 
     private fun extractTextFromAnthropicResponse(responseBody: String): String {
-        // Parse the Anthropic API response format
-        val jsonResponse = json.parseToJsonElement(responseBody)
-        val content = jsonResponse.jsonObject["content"]?.jsonArray?.get(0)
-        return content?.jsonObject?.get("text")?.toString()?.trim('"')
-            ?: throw Exception("Could not extract text from API response")
+        // Parse the Anthropic API response format using Gson
+        val gson = com.google.gson.Gson()
+        val jsonResponse = gson.fromJson(responseBody, com.google.gson.JsonObject::class.java)
+
+        val contentArray = jsonResponse.getAsJsonArray("content")
+        if (contentArray != null && contentArray.size() > 0) {
+            val firstContent = contentArray.get(0).asJsonObject
+            val text = firstContent.get("text")?.asString
+            if (text != null) {
+                return text
+            }
+        }
+
+        throw Exception("Could not extract text from API response")
     }
 
     private fun parseLayer1Response(response: String): AppSpecification {
