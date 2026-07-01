@@ -92,6 +92,9 @@ dependencies {
     // Datastore for preferences
     implementation("androidx.datastore:datastore-preferences:1.0.0")
 
+    // Security - encrypted credential storage (Anthropic API key at rest)
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
     // Testing
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
