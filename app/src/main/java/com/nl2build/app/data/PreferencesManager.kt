@@ -1,47 +1,76 @@
 package com.nl2build.app.data
 
 import android.content.Context
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
+import android.content.SharedPreferences
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.map
 
-private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
-
+/**
+ * Stores user credentials (the Anthropic API key) and settings using
+ * [EncryptedSharedPreferences], so secrets are encrypted at rest with a
+ * master key held in the Android Keystore.
+ *
+ * This replaces the previous plaintext DataStore implementation, which stored
+ * the API key unencrypted despite documentation claiming otherwise. The public
+ * API (Flows + suspend setters) is unchanged, so callers need no modification.
+ */
 class PreferencesManager(private val context: Context) {
 
     companion object {
-        private val ANTHROPIC_API_KEY = stringPreferencesKey("anthropic_api_key")
-        private val BACKEND_URL = stringPreferencesKey("backend_url")
+        private const val PREFS_FILE = "nl2build_secure_settings"
+        private const val KEY_ANTHROPIC_API_KEY = "anthropic_api_key"
+        private const val KEY_BACKEND_URL = "backend_url"
 
-        // Default backend URL - you'll need to deploy this backend
-        private const val DEFAULT_BACKEND_URL = "https://nl2build-backend.your-domain.com/api"
+        // No backend is bundled. The app must be pointed at a real backend in
+        // Settings before a build can be submitted. An empty default makes an
+        // unconfigured state fail honestly instead of hitting a fake domain.
+        const val DEFAULT_BACKEND_URL = ""
     }
 
-    val anthropicApiKey: Flow<String?> = context.dataStore.data.map { preferences ->
-        preferences[ANTHROPIC_API_KEY]
+    private val prefs: SharedPreferences by lazy {
+        val masterKey = MasterKey.Builder(context)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
+
+        EncryptedSharedPreferences.create(
+            context,
+            PREFS_FILE,
+            masterKey,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
     }
 
-    val backendUrl: Flow<String> = context.dataStore.data.map { preferences ->
-        preferences[BACKEND_URL] ?: DEFAULT_BACKEND_URL
+    /** Emit the current value and re-emit whenever [key] changes. */
+    private fun stringFlow(key: String, default: String?): Flow<String?> = callbackFlow {
+        trySend(prefs.getString(key, default))
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { sp, changedKey ->
+            if (changedKey == key) {
+                trySend(sp.getString(key, default))
+            }
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
     }
+
+    val anthropicApiKey: Flow<String?> = stringFlow(KEY_ANTHROPIC_API_KEY, null)
+
+    val backendUrl: Flow<String> =
+        stringFlow(KEY_BACKEND_URL, DEFAULT_BACKEND_URL).map { it ?: DEFAULT_BACKEND_URL }
 
     suspend fun saveAnthropicApiKey(apiKey: String) {
-        context.dataStore.edit { preferences ->
-            preferences[ANTHROPIC_API_KEY] = apiKey
-        }
+        prefs.edit().putString(KEY_ANTHROPIC_API_KEY, apiKey).apply()
     }
 
     suspend fun saveBackendUrl(url: String) {
-        context.dataStore.edit { preferences ->
-            preferences[BACKEND_URL] = url
-        }
+        prefs.edit().putString(KEY_BACKEND_URL, url).apply()
     }
 
     suspend fun clearAll() {
-        context.dataStore.edit { it.clear() }
+        prefs.edit().clear().apply()
     }
 }
