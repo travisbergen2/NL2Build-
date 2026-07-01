@@ -149,39 +149,116 @@ class BuildService {
     }
   }
 
-  async signApk(projectDir, outputDir, buildJobId) {
-    // Find the unsigned APK
-    const apkPath = path.join(projectDir, 'app/build/outputs/apk/release/app-release-unsigned.apk');
-    const signedApkPath = path.join(outputDir, `app-${buildJobId}.apk`);
+  /**
+   * Resolve the signing configuration from environment variables.
+   *
+   * IMPORTANT: This deliberately THROWS when signing is not configured.
+   * We must never return an unsigned artifact as if it were a signed
+   * release build. A build that cannot be honestly signed must fail.
+   */
+  getSigningConfig() {
+    const keystorePath = process.env.KEYSTORE_PATH;
+    const keystorePassword = process.env.KEYSTORE_PASSWORD;
+    const keyAlias = process.env.KEY_ALIAS;
+    // If a separate key password is not provided, fall back to the store password.
+    const keyPassword = process.env.KEY_PASSWORD || keystorePassword;
 
-    if (await fs.pathExists(apkPath)) {
-      // In production, use proper keystore
-      // For now, just copy the unsigned APK (it will still work for testing)
-      await fs.copy(apkPath, signedApkPath);
-      return signedApkPath;
-    } else {
-      // Try alternate path
-      const altApkPath = path.join(projectDir, 'app/build/outputs/apk/release/app-release.apk');
-      if (await fs.pathExists(altApkPath)) {
-        await fs.copy(altApkPath, signedApkPath);
-        return signedApkPath;
-      }
-      throw new Error('APK not found after build');
+    if (!keystorePath || !keystorePassword || !keyAlias) {
+      throw new Error(
+        'Release signing is not configured. Set KEYSTORE_PATH, KEYSTORE_PASSWORD and KEY_ALIAS ' +
+        '(and optionally KEY_PASSWORD) before requesting a release build. ' +
+        'Refusing to return an unsigned artifact as a signed release.'
+      );
     }
+    if (!fs.pathExistsSync(keystorePath)) {
+      throw new Error(`Keystore not found at KEYSTORE_PATH=${keystorePath}`);
+    }
+    return { keystorePath, keystorePassword, keyAlias, keyPassword };
   }
 
+  /**
+   * Locate an Android build-tool (e.g. apksigner) inside the installed SDK,
+   * preferring the highest available build-tools version. Falls back to
+   * assuming the tool is on PATH.
+   */
+  resolveBuildTool(tool) {
+    const sdk = process.env.ANDROID_SDK_ROOT || process.env.ANDROID_HOME;
+    if (sdk) {
+      const buildToolsDir = path.join(sdk, 'build-tools');
+      if (fs.pathExistsSync(buildToolsDir)) {
+        const versions = fs.readdirSync(buildToolsDir).sort().reverse();
+        for (const version of versions) {
+          const candidate = path.join(buildToolsDir, version, tool);
+          if (fs.pathExistsSync(candidate)) {
+            return candidate;
+          }
+        }
+      }
+    }
+    return tool;
+  }
+
+  /**
+   * Sign the release APK with a real keystore using apksigner, then verify
+   * the signature. If verification fails, the build fails — we never hand
+   * back an artifact we could not prove is signed.
+   */
+  async signApk(projectDir, outputDir, buildJobId) {
+    const unsignedApk = path.join(projectDir, 'app/build/outputs/apk/release/app-release-unsigned.apk');
+    const altApk = path.join(projectDir, 'app/build/outputs/apk/release/app-release.apk');
+    const inputApk = (await fs.pathExists(unsignedApk))
+      ? unsignedApk
+      : (await fs.pathExists(altApk)) ? altApk : null;
+
+    if (!inputApk) {
+      throw new Error('APK not found after build');
+    }
+
+    const signing = this.getSigningConfig();
+    const apksigner = this.resolveBuildTool('apksigner');
+    const signedApkPath = path.join(outputDir, `app-${buildJobId}.apk`);
+
+    // Copy the built APK to the output location, then sign it in place.
+    await fs.copy(inputApk, signedApkPath);
+
+    await execAsync(
+      `"${apksigner}" sign ` +
+      `--ks "${signing.keystorePath}" ` +
+      `--ks-pass pass:"${signing.keystorePassword}" ` +
+      `--ks-key-alias "${signing.keyAlias}" ` +
+      `--key-pass pass:"${signing.keyPassword}" ` +
+      `"${signedApkPath}"`
+    );
+
+    // Verify the signature. If this throws, the caller reports a FAILED build.
+    await execAsync(`"${apksigner}" verify "${signedApkPath}"`);
+
+    return signedApkPath;
+  }
+
+  /**
+   * Sign the release AAB. App Bundles are signed with jarsigner (apksigner
+   * does not support .aab). Same honesty rule: no keystore -> hard failure.
+   */
   async signAab(projectDir, outputDir, buildJobId) {
-    // Find the AAB
     const aabPath = path.join(projectDir, 'app/build/outputs/bundle/release/app-release.aab');
+    if (!(await fs.pathExists(aabPath))) {
+      throw new Error('AAB not found after build');
+    }
+
+    const signing = this.getSigningConfig();
     const signedAabPath = path.join(outputDir, `app-${buildJobId}.aab`);
 
-    if (await fs.pathExists(aabPath)) {
-      // In production, use proper keystore
-      // For now, just copy the AAB
-      await fs.copy(aabPath, signedAabPath);
-      return signedAabPath;
-    }
-    throw new Error('AAB not found after build');
+    await fs.copy(aabPath, signedAabPath);
+
+    await execAsync(
+      `jarsigner -keystore "${signing.keystorePath}" ` +
+      `-storepass "${signing.keystorePassword}" ` +
+      `-keypass "${signing.keyPassword}" ` +
+      `"${signedAabPath}" "${signing.keyAlias}"`
+    );
+
+    return signedAabPath;
   }
 
   getApkPath(buildJobId) {
