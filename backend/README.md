@@ -110,7 +110,14 @@ Download the built AAB file.
 PORT=3000                          # Server port
 NODE_ENV=production                # Environment
 BASE_URL=http://localhost:3000     # Base URL for download links
-ANDROID_SDK_ROOT=/path/to/sdk      # Android SDK location
+ANDROID_SDK_ROOT=/path/to/sdk      # Android SDK location (provides apksigner)
+
+# Release signing — REQUIRED for release builds.
+# If these are unset, a release build FAILS rather than returning an unsigned artifact.
+KEYSTORE_PATH=/path/to/release.keystore
+KEYSTORE_PASSWORD=your_store_password
+KEY_ALIAS=your_key_alias
+KEY_PASSWORD=your_key_password     # optional; defaults to KEYSTORE_PASSWORD
 ```
 
 ## Build Process
@@ -121,7 +128,11 @@ ANDROID_SDK_ROOT=/path/to/sdk      # Android SDK location
 4. **Set up Gradle** wrapper
 5. **Build APK** using `./gradlew assembleRelease`
 6. **Build AAB** using `./gradlew bundleRelease`
-7. **Sign artifacts** (currently copies unsigned for testing)
+7. **Sign artifacts**: the APK is signed with `apksigner` and then verified with
+   `apksigner verify`; the AAB is signed with `jarsigner`. Signing uses the
+   keystore from the environment variables above. **If no keystore is
+   configured, the build fails** — an unsigned artifact is never returned as a
+   signed release.
 8. **Store in output directory**
 9. **Cleanup workspace**
 10. **Serve download links**
@@ -130,7 +141,10 @@ ANDROID_SDK_ROOT=/path/to/sdk      # Android SDK location
 
 ### Signing
 
-Currently, the service copies unsigned builds. For production:
+Release artifacts are signed for real: the APK with `apksigner` (then verified
+with `apksigner verify`), and the AAB with `jarsigner`. Signing is **required** —
+if the keystore environment variables are not set, the build fails instead of
+returning an unsigned artifact.
 
 1. Generate a keystore:
    ```bash
@@ -138,7 +152,7 @@ Currently, the service copies unsigned builds. For production:
      -alias my-key-alias -keyalg RSA -keysize 2048 -validity 10000
    ```
 
-2. Configure signing in environment:
+2. Configure signing in the environment (see **Environment Variables** above):
    ```env
    KEYSTORE_PATH=/path/to/release.keystore
    KEYSTORE_PASSWORD=your_password
@@ -146,7 +160,14 @@ Currently, the service copies unsigned builds. For production:
    KEY_PASSWORD=your_key_password
    ```
 
-3. Update `buildService.js` to use `jarsigner` or `apksigner`
+3. Ensure the signing tools are available:
+   - `apksigner` is located automatically from `ANDROID_SDK_ROOT/build-tools`
+     (highest installed version).
+   - `jarsigner` must be on `PATH` (it ships with the JDK).
+
+> **Note on keys:** the same signing identity must be reused for every update to
+> a given app, or Android/Play will reject the upgrade. Keep the keystore safe
+> and backed up.
 
 ### Persistence
 
@@ -178,6 +199,12 @@ Set the `ANDROID_SDK_ROOT` environment variable:
 ```bash
 export ANDROID_SDK_ROOT=/path/to/android/sdk
 ```
+
+### Build fails with "Release signing is not configured"
+
+Set `KEYSTORE_PATH`, `KEYSTORE_PASSWORD`, and `KEY_ALIAS` (and optionally
+`KEY_PASSWORD`). This error is intentional: the service will not return an
+unsigned artifact as a signed release.
 
 ### Permission denied on gradlew
 
