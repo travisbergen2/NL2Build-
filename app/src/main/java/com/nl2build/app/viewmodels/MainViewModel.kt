@@ -53,6 +53,15 @@ class MainViewModel(
             return
         }
 
+        // A build backend must be configured. There is no bundled/default backend,
+        // so refuse to start rather than firing requests at an empty/placeholder URL.
+        val currentBackendUrl = backendUrl.value
+        if (currentBackendUrl.isBlank()) {
+            _errorMessage.value =
+                "No build backend configured. Add your build backend URL in Settings before generating an app."
+            return
+        }
+
         viewModelScope.launch {
             try {
                 _isProcessing.value = true
@@ -66,7 +75,7 @@ class MainViewModel(
                 _currentProject.value = project
 
                 // Initialize AI service
-                val aiService = AIService(currentApiKey, backendUrl.value)
+                val aiService = AIService(currentApiKey, currentBackendUrl)
 
                 // Layer 1: Analyze description
                 _buildMessage.value = "Layer 1 AI: Analyzing your description..."
