@@ -155,7 +155,10 @@ Respond with ONLY the JSON, no additional text.
     private suspend fun callAnthropicAPI(prompt: String): String {
         // Use Gson for proper JSON encoding
         val requestMap = mapOf(
-            "model" to "claude-3-5-sonnet-20241022",
+            // NOTE: claude-3-5-sonnet-20241022 was retired; keep this current or
+            // prefer the server-side pipeline (POST /api/generate), which resolves
+            // the model dynamically and needs no client-side API key.
+            "model" to "claude-sonnet-4-5",
             "max_tokens" to 4096,
             "messages" to listOf(
                 mapOf(
@@ -239,7 +242,7 @@ Respond with ONLY the JSON, no additional text.
             ).toRequestBody("application/json".toMediaType())
 
             val request = Request.Builder()
-                .url("$backendUrl/build")
+                .url("$backendUrl/api/build") // was "$backendUrl/build" — server mounts /api/build
                 .post(requestBody)
                 .build()
 

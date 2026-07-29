@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const buildRoutes = require('./routes/build');
+const generateRoutes = require('./routes/generate');
 const { initializeDirectories } = require('./utils/fileSystem');
 
 const app = express();
@@ -17,6 +18,7 @@ initializeDirectories();
 
 // Routes
 app.use('/api/build', buildRoutes);
+app.use('/api/generate', generateRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
