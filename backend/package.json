@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "test": "node --test test/generationService.test.js",
+    "test": "node --test test/generationService.test.js test/workerClient.test.js",
     "build": "echo 'No build step required'",
     "docker:build": "docker build -t nl2build-backend .",
     "docker:run": "docker run -p 3000:3000 nl2build-backend"

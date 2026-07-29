@@ -14,7 +14,8 @@ const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const buildService = require('./../services/buildService');
-const { GenerationService, GenerationError } = require('../services/generationService');
+const { GenerationError } = require('../services/generationService');
+const { createGenerationBackend } = require('../services/workerClient');
 const { getBuildStatus, updateBuildStatus, BuildStatus } = require('../models/buildJob');
 
 const MAX_REPAIRS = parseInt(process.env.NL2B_MAX_REPAIRS || '2', 10);
@@ -59,7 +60,9 @@ router.post('/', async (req, res) => {
 });
 
 async function runPipeline(projectId, buildJobId, description, packageName) {
-  const gen = new GenerationService();
+  // Backend selection: NL2B_BACKEND=api (direct Anthropic, default) | worker
+  // (webhook-invoked Hyperagent worker agent — E-NL2B-2c wire path).
+  const gen = createGenerationBackend();
 
   updateBuildStatus(buildJobId, { progress: 5, message: 'Generating project (chunked, per-file)...' });
   let { files, meta } = await gen.generateProject(description, packageName);
